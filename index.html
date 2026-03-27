@@ -22,7 +22,7 @@
         /* Hero */
         .hero { display: flex; align-items: center; gap: 40px; padding: 40px 0; }
         .hero-img { flex: 0 0 300px; }
-        .hero-img img { width: 100%; border-radius: 15px; box-shadow: 10px 10px 0 var(--accent); }
+        .hero-img img { width: 100%; border-radius: 15px; box-shadow: 10px 10px 0 var(--accent); object-fit: cover; aspect-ratio: 1; }
         .hero-text { flex: 1; }
 
         /* Filter Bar */
@@ -48,9 +48,17 @@
         .comment-form input, .comment-form textarea { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ddd; box-sizing: border-box; }
         .submit-btn { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 
+        /* CV Page Specific */
+        .cv-grid { display: flex; gap: 30px; align-items: flex-start; margin-top: 30px; }
+        .cv-image { flex: 0 0 250px; }
+        .cv-image img { width: 100%; border-radius: 10px; object-fit: cover; aspect-ratio: 1; }
+        .cv-content { flex: 1; height: 70vh; }
+
         @media (max-width: 768px) {
             .hero { flex-direction: column; text-align: center; }
             .hero-img { flex: none; width: 200px; }
+            .cv-grid { flex-direction: column; align-items: center; }
+            .cv-image { width: 100%; }
         }
     </style>
 </head>
@@ -61,9 +69,9 @@
     <div class="nav-links">
         <a onclick="showPage('home')">בית</a>
         <a onclick="showPage('gallery')">גלריה</a>
-        <a onclick="showPage('texts')">סיפורים</a>
+        <a onclick="showPage('texts')">יצירות</a>
         <a onclick="showPage('jokes')">בדיחות</a>
-        <a onclick="showPage('about')">אודות</a>
+        <a onclick="showPage('about')">קורות חיים</a>
     </div>
 </nav>
 
@@ -79,26 +87,46 @@
 </div>
 
 <script>
+    // הקישורים לגיליונות ה-CSV שלך
     const JOKES_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSR74JGStqevOMg4uFKqudbSRFEQVRisiEgSwTuxnLjsTUx7TShIVuzPkdRgOZiJq8Pz3H-zoa_3mK3/pub?gid=0&single=true&output=csv';
     const PHOTOS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSevdjPZljQNazIav8vcVOszHVu5iKOA-AtYUjwhZGuZUibJpjgnJHC_tsrZY11p9aAE_iQytePZsAZ/pub?output=csv';
     const TEXTS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSXdGMnIRS-ydFn4BRfngLIAbdveYx7L7eS96kCvpruVDca1-uGk3qyQY9Nh9C_eTpbjKoojzB2zlFn/pub?gid=1983290067&single=true&output=csv';
     const COMMENTS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRLoH5kw3YDw4HGqSflNsJfe-Gaq34n-5916WzKs-wFlAiCOUiit6ZqmkUiKprnAyJ6ezB0bwQhkGej/pub?output=csv';
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwqak-Ai_5xyULt8tV0cjexgd-yp7K6ACOTAJXYhdGdaG3v_xqD-vcAS-dgnjBnRyVr/exec';
 
+    // התמונה הראשית הקבועה (של ברק)
+    const MAIN_PHOTO_ID = '1S-KFrVUHzS9dJsN1ag8EwfNyiXwFHqC-';
+    // מסמך קורות החיים המפורסם שלך
+    const CV_DOC_PUB_LINK = 'https://docs.google.com/document/d/e/2PACX-1vS9e8D1vcOMS1XjjGMhGltDcKuCcFBL1Yv5_hBQ2mzK7i371Mhcg7VNEd5oKIQfsRTNA7k7ldc-zcjM/pub?embedded=true';
+
     let data = { jokes: [], photos: [], texts: [], comments: [] };
     let currentOpenItem = null;
 
+    // פורמט תמונה יציב מדרייב
+    function getPhotoUrl(id) {
+        return `https://lh3.googleusercontent.com/u/0/d/${id}`;
+    }
+
     async function init() {
+        // טעינת כל הנתונים במקביל
         const [j, p, t, c] = await Promise.all([
             fetchCSV(JOKES_URL, true), fetchCSV(PHOTOS_URL, true), fetchCSV(TEXTS_URL, true), fetchCSV(COMMENTS_URL, true)
         ]);
         
         data.jokes = j;
-        // מיפוי לפי שמות העמודות שנתת: id, title, category
+        // מיפוי גיליון התמונות לפי העמודות id, title, category
         data.photos = p.map(r => ({ title: r.title, id: r.id, category: r.category || 'כללי' }));
-        data.texts = t;
+        // מיפוי גיליון היצירות לפי העמודות החדשות שלך
+        data.texts = t.map(r => ({ 
+            id: r.id, 
+            title: r.title, 
+            type: r.type, 
+            category: r.category, 
+            summary: r.summary, 
+            content_link: r.content_link 
+        }));
         
-        // סינון לפי עמודת Approve בגיליון תגובות
+        // סינון תגובות שאושרו על ידך
         data.comments = c.filter(r => r.Approve === "YES");
 
         showPage('home');
@@ -113,7 +141,7 @@
         window.scrollTo(0,0);
         if (pageId === 'home') renderHome(container);
         else if (pageId === 'gallery') renderArchive(container, 'גלריה', data.photos, 'category', renderPhotoCard);
-        else if (pageId === 'texts') renderArchive(container, 'סיפורים ויצירות', data.texts, 'Type', renderTextCard);
+        else if (pageId === 'texts') renderArchive(container, 'סיפורים ויצירות', data.texts, 'type', renderTextCard);
         else if (pageId === 'jokes') renderArchive(container, 'מאגר הבדיחות', data.jokes, 'Categories', renderJokeCard);
         else if (pageId === 'about') renderAbout(container);
     }
@@ -125,7 +153,7 @@
 
         container.innerHTML = `
             <div class="hero">
-                <div class="hero-img"><img src="https://lh3.googleusercontent.com/d/${data.photos[0]?.id || ''}"></div>
+                <div class="hero-img"><img src="${getPhotoUrl(MAIN_PHOTO_ID)}" alt="ברק לב שלם"></div>
                 <div class="hero-text">
                     <h1>ברק לב שלם</h1>
                     <p>ברוכים הבאים לאתר הזיכרון של ברק. מקום שבו אספנו את המילים שלו, החיוך שלו והבדיחות שתמיד ידע לספר.</p>
@@ -137,7 +165,7 @@
             </div>
             <div class="section-header"><h3>מהגלריה</h3><button class="filter-btn" onclick="showPage('gallery')">הצג הכל</button></div>
             <div class="grid">${samplePhotos.map(renderPhotoCard).join('')}</div>
-            <div class="section-header"><h3>סיפורים ויצירות</h3><button class="filter-btn" onclick="showPage('texts')">הצג הכל</button></div>
+            <div class="section-header"><h3>יצירות נבחרות</h3><button class="filter-btn" onclick="showPage('texts')">הצג הכל</button></div>
             <div class="grid">${sampleTexts.map(renderTextCard).join('')}</div>
         `;
     }
@@ -168,14 +196,18 @@
 
     function renderPhotoCard(p) {
         return `<div class="card" data-cat="${p.category}" onclick="openItem('photo', '${p.id}')">
-            <img src="https://lh3.googleusercontent.com/d/${p.id}">
+            <img src="${getPhotoUrl(p.id)}">
             <div class="card-content"><span class="tag">${p.category}</span><p>${p.title}</p></div>
         </div>`;
     }
 
     function renderTextCard(t) {
-        return `<div class="card" data-cat="${t.Type}" onclick="openItem('text', '${t.Link}')">
-            <div class="card-content"><span class="tag">${t.Type}</span><h4>${t.Title}</h4><p>${t.Author || ''}</p></div>
+        return `<div class="card" data-cat="${t.type}" onclick="openItem('text', '${t.content_link}')">
+            <div class="card-content">
+                <span class="tag">${t.type}</span>
+                <h4>${t.title}</h4>
+                <p style="font-size:0.9rem; color:#666;">${t.summary || ''}</p>
+            </div>
         </div>`;
     }
 
@@ -195,12 +227,11 @@
         document.getElementById('item-modal').style.display = 'flex';
         body.innerHTML = 'טוען...';
 
-        if(type === 'photo') body.innerHTML = `<img src="https://lh3.googleusercontent.com/d/${id}" style="max-width:100%; border-radius:10px;">`;
+        if(type === 'photo') body.innerHTML = `<img src="${getPhotoUrl(id)}" style="max-width:100%; border-radius:10px;">`;
         else if(type === 'joke') {
             const joke = data.jokes[id];
             body.innerHTML = `<h3>בדיחה</h3><p style="font-size:1.4rem;">"${joke['Joke Content']}"</p><div class="source-tag">${joke.Source || ''}</div>`;
         } else if(type === 'text') {
-            // חילוץ מזהה המסמך מהקישור וטעינה בתוך iframe
             const docId = id.includes('/d/') ? id.split('/d/')[1].split('/')[0] : id;
             body.innerHTML = `<iframe src="https://docs.google.com/document/d/${docId}/pub?embedded=true" style="width:100%; height:70vh; border:none;"></iframe>`;
         }
@@ -244,7 +275,18 @@
     }
     
     function renderAbout(container) {
-        container.innerHTML = `<div class="container" style="max-width:700px"><h2>אודות האתר</h2><p>כאן תוכל להוסיף את הטקסט שרצית על האתר ועל ברק.</p></div>`;
+        container.innerHTML = `
+            <div class="container" style="max-width:900px">
+                <h2>קורות חיים - ברק לב שלם</h2>
+                <div class="cv-grid">
+                    <div class="cv-image">
+                        <img src="${getPhotoUrl(MAIN_PHOTO_ID)}" alt="ברק לב שלם">
+                    </div>
+                    <div class="cv-content">
+                        <iframe src="${CV_DOC_PUB_LINK}" style="width:100%; height:100%; border:none;"></iframe>
+                    </div>
+                </div>
+            </div>`;
     }
 
     window.onload = init;
